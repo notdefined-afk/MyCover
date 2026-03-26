@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Loop — My Cover</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect } = React;
+
+const T = {
+  teal: "#2BB5A0", tealDk: "#1E9B88", tealLt: "#E6F7F5", tealPale: "#F2FAFA",
+  coral: "#F07060", coralLt: "#FEF2F0",
+  amber: "#F59E0B", amberLt: "#FFFBEB", amberBdr: "#FDE68A",
+  bg: "#F5F7F9", white: "#FFFFFF",
+  text: "#1A1A2E", text2: "#4A5568", muted: "#9AA5B4",
+  bdr: "#E2E8F0", bdr2: "#EDF2F7",
+};
+
+const SYSTEM_PROMPT = `You are the Loop Health Policy Assistant for Indian employees.
+
+Policy: Meesho Technologies Group Health — ₹5,00,000 sum insured, self + spouse + 2 dependents.
+Covered: hospitalisation (min 24hrs), daycare procedures, pre/post hospitalisation (30/60 days), maternity (9-month waiting period, up to ₹50,000), ambulance, room rent (1% of SI/day).
+NOT covered: routine dental, spectacles, OPD pharmacy, cosmetic procedures.
+
+CRITICAL: Detect the intent of the question and respond in the correct format below.
+
+--- FORMAT A: COVERAGE QUESTION (is X covered, does policy cover X, coverage for X) ---
+INTENT: COVERAGE
+STATUS: COVERED | NOT_COVERED | PARTIAL
+AMOUNT: [e.g. Up to ₹5,00,000 or Sub-limit: ₹50,000]
+CONDITIONS:
+- [condition: value]
+- [condition: value]
+HOSPITALS:
+- Apollo Hospitals — Koramangala, 3 km — Cashless
+- Manipal Hospital — Whitefield, 5 km — Cashless
+- Fortis Hospital — Bannerghatta, 7 km — Reimbursement
+STEPS:
+1. [step]
+2. [step]
+CHIPS: documents,preauth
+
+--- FORMAT B: PROCESS QUESTION (how does X work, what do I do for X, steps for X) ---
+INTENT: PROCESS
+CONFIRMATION: [one line: yes/no this is/isn't covered, e.g. "Fracture treatment is covered under your policy"]
+STEPS:
+1. [step]
+2. [step]
+3. [step]
+TIMELINE: [e.g. Cashless: approved within 4-6 hours. Reimbursement: settled within 15-30 days]
+CHIPS: documents,cashless
+
+--- FORMAT C: DOCUMENT QUESTION (what documents, what to carry, paperwork) ---
+INTENT: DOCUMENTS
+CASHLESS:
+- [document]
+- [document]
+REIMBURSEMENT:
+- [document]
+- [document]
+CHIPS: none
+
+--- FORMAT D: NOT COVERED ---
+INTENT: NOT_COVERED
+REASON: [plain factual statement, no drama]
+EXCEPTION: [only if there is a genuine exception, e.g. accidental dental. Otherwise leave blank]
+CHIPS: none
+
+RULES:
+- Detect intent accurately. "How does reimbursement work for fracture" = PROCESS not COVERAGE
+- CONDITIONS lines must be "Label: Value" format e.g. "Minimum stay: 24 hours"
+- Never use markdown bold (**text**) anywhere
+- Plain English only, no insurance jargon
+- For PARTIAL coverage use FORMAT A with STATUS: PARTIAL and show what is and isn't covered in CONDITIONS
+- Always include CHIPS line`;
+
+function parse(txt) {
+  const keys = ["INTENT","STATUS","AMOUNT","CONDITIONS","HOSPITALS","STEPS","CHIPS",
+    "CONFIRMATION","TIMELINE","CASHLESS","REIMBURSEMENT","REASON","EXCEPTION"];
+  const p = {}; let ck = null, cl = [];
+  for (const line of txt.split("\n")) {
+    const ci = line.indexOf(":");
+    const k = line.substring(0, ci).trim();
+    if (ci > 0 && keys.includes(k)) {
+      if (ck) p[ck] = cl.join("\n").trim();
+      ck = k; cl = [line.substring(ci + 1).trim()];
+    } else if (ck) cl.push(line);
+  }
+  if (ck) p[ck] = cl.join("\n").trim();
+  return p;
+}
+
+function parseList(str) {
+  return (str || "").split("\n").map(l => l.replace(/^[-•*\d.]\s*/, "").trim()).filter(Boolean);
+}
+
+function parseConditions(str) {
+  return parseList(str).map(l => {
+    const ci = l.indexOf(":");
+    return ci > 0 ? { label: l.substring(0, ci).trim(), val: l.substring(ci + 1).trim() } : { label: "", val: l };
+  });
+}
+
+function parseHospitals(str) {
+  return parseList(str).filter(l => !l.toLowerCase().includes("sample")).map((l, i) => {
+    const pts = l.split("—").map(s => s.trim());
+    return { n: i + 1, name: pts[0] || l, meta: pts[1] || "", cash: l.toLowerCase().includes("cashless") };
+  });
+}
+
+function getChips(chipStr, intent) {
+  const chipMap = {
+    documents: "What documents do I need?",
+    preauth: "Is pre-auth required?",
+    cashless: "Nearest cashless hospital?",
+    accident: "What if it was due to an accident?",
+    outofpocket: "What do I pay out of pocket?",
+  };
+  if (!chipStr || chipStr.trim() === "none") return [];
+  return chipStr.split(",").map(c => chipMap[c.trim()]).filter(Boolean);
+}
+
+// ── VERDICT BADGE ──
+function Verdict({ status, amount }) {
+  const cfg = {
+    COVERED: { bg: "#D1FAE5", color: "#065F46", label: "Covered" },
+    PARTIAL: { bg: "#FEF3C7", color: "#92400E", label: "Partially Covered" },
+    NOT_COVERED: { bg: "#FFFBEB", color: "#92400E", label: "Not Covered" },
+  }[status] || { bg: T.bdr, color: T.text2, label: status };
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: cfg.bg, borderRadius: 10, padding: "8px 14px" }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: cfg.color }}>{cfg.label}</span>
+        {amount && <span style={{ fontSize: 13, fontWeight: 500, color: cfg.color, opacity: 0.8 }}>· {amount}</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── SECTION CARD ──
+function Section({ title, children }) {
+  return (
+    <div style={{ background: T.white, border: `1px solid ${T.bdr}`, borderRadius: 12, overflow: "hidden", marginBottom: 8, maxWidth: "95%" }}>
+      <div style={{ padding: "8px 13px", borderBottom: `1px solid ${T.bdr2}`, background: T.bg }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: T.text2, textTransform: "uppercase", letterSpacing: "0.5px" }}>{title}</span>
+      </div>
+      <div style={{ padding: "10px 13px" }}>{children}</div>
+    </div>
+  );
+}
+
+// ── CONDITION ROWS ──
+function CondRows({ items }) {
+  return (
+    <>
+      {items.map((c, i) => (
+        <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "5px 0", borderBottom: i < items.length - 1 ? `1px solid ${T.bdr2}` : "none", gap: 12 }}>
+          <span style={{ fontSize: 12, color: T.muted, flexShrink: 0, maxWidth: "45%", textAlign: "left" }}>{c.label}</span>
+          <span style={{ fontSize: 12, fontWeight: 500, color: T.text, textAlign: "right" }}>{c.val}</span>
+        </div>
+      ))}
+    </>
+  );
+}
+
+// ── STEPS LIST ──
+function Steps({ items }) {
+  return (
+    <>
+      {items.map((s, i) => (
+        <div key={i} style={{ display: "flex", gap: 10, padding: "6px 0", borderBottom: i < items.length - 1 ? `1px solid ${T.bdr2}` : "none", alignItems: "flex-start" }}>
+          <div style={{ width: 18, height: 18, background: T.teal, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "white", flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
+          <span style={{ fontSize: 12, color: T.text, lineHeight: 1.55, flex: 1 }}>{s}</span>
+        </div>
+      ))}
+    </>
+  );
+}
+
+// ── HOSPITAL LIST ──
+function Hospitals({ items }) {
+  return (
+    <>
+      {items.map((h, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: "7px 0", borderBottom: i < items.length - 1 ? `1px solid ${T.bdr2}` : "none" }}>
+          <div style={{ width: 18, height: 18, background: T.tealLt, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: T.tealDk, flexShrink: 0 }}>{h.n}</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{h.name}</div>
+            {h.meta && <div style={{ fontSize: 10, color: T.muted, marginTop: 1 }}>{h.meta}</div>}
+          </div>
+          <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 8, background: h.cash ? "#D1FAE5" : "#FEF3C7", color: h.cash ? "#065F46" : "#92400E", flexShrink: 0 }}>{h.cash ? "Cashless" : "Reimb."}</span>
+        </div>
+      ))}
+      <div style={{ marginTop: 8, fontSize: 10, color: T.muted, lineHeight: 1.4, paddingTop: 8, borderTop: `1px solid ${T.bdr2}` }}>
+        ⚠ Sample data — live network requires TPA API integration
+      </div>
+    </>
+  );
+}
+
+// ── CHIP STRIP ──
+function ChipStrip({ chips, onSug }) {
+  if (!chips || chips.length === 0) return null;
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6, maxWidth: "95%" }}>
+      {chips.map(c => (
+        <div key={c} onClick={() => onSug(c)} style={{ background: T.white, border: `1.5px solid ${T.bdr}`, borderRadius: 20, padding: "5px 12px", fontSize: 12, fontWeight: 500, color: T.text, cursor: "pointer", whiteSpace: "nowrap" }}>{c}</div>
+      ))}
+    </div>
+  );
+}
+
+// ── STRUCTURED RESPONSE RENDERER ──
+function StructuredResp({ text, onSug }) {
+  const p = parse(text);
+  const intent = (p["INTENT"] || "").trim();
+  const chips = getChips(p["CHIPS"], intent);
+
+  // FORMAT A: COVERAGE
+  if (intent === "COVERAGE") {
+    const status = (p["STATUS"] || "").trim();
+    const conds = parseConditions(p["CONDITIONS"]);
+    const hosps = parseHospitals(p["HOSPITALS"]);
+    const steps = parseList(p["STEPS"]);
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-start", maxWidth: "95%" }}>
+        <Verdict status={status} amount={p["AMOUNT"]} />
+        {conds.length > 0 && <Section title="Conditions"><CondRows items={conds} /></Section>}
+        {hosps.length > 0 && <Section title="Nearby Network Hospitals"><Hospitals items={hosps} /></Section>}
+        {steps.length > 0 && <Section title="What to do next"><Steps items={steps} /></Section>}
+        <ChipStrip chips={chips} onSug={onSug} />
+      </div>
+    );
+  }
+
+  // FORMAT B: PROCESS
+  if (intent === "PROCESS") {
+    const steps = parseList(p["STEPS"]);
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-start", maxWidth: "95%" }}>
+        {p["CONFIRMATION"] && (
+          <div style={{ background: T.tealPale, border: `1px solid ${T.tealLt}`, borderRadius: 10, padding: "9px 13px", marginBottom: 6, maxWidth: "95%" }}>
+            <span style={{ fontSize: 13, color: T.tealDk, fontWeight: 500 }}>{p["CONFIRMATION"]}</span>
+          </div>
+        )}
+        {steps.length > 0 && <Section title="Step-by-step process"><Steps items={steps} /></Section>}
+        {p["TIMELINE"] && (
+          <div style={{ background: T.bg, border: `1px solid ${T.bdr}`, borderRadius: 10, padding: "9px 13px", maxWidth: "95%" }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>Timeline</div>
+            <div style={{ fontSize: 12, color: T.text2, lineHeight: 1.55 }}>{p["TIMELINE"]}</div>
+          </div>
+        )}
+        <ChipStrip chips={chips} onSug={onSug} />
+      </div>
+    );
+  }
+
+  // FORMAT C: DOCUMENTS
+  if (intent === "DOCUMENTS") {
+    const cashless = parseList(p["CASHLESS"]);
+    const reimb = parseList(p["REIMBURSEMENT"]);
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-start", maxWidth: "95%" }}>
+        {cashless.length > 0 && (
+          <Section title="For cashless claims">
+            {cashless.map((d, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "5px 0", borderBottom: i < cashless.length - 1 ? `1px solid ${T.bdr2}` : "none" }}>
+                <span style={{ color: T.teal, fontWeight: 700, fontSize: 12, flexShrink: 0 }}>✓</span>
+                <span style={{ fontSize: 12, color: T.text, lineHeight: 1.45 }}>{d}</span>
+              </div>
+            ))}
+          </Section>
+        )}
+        {reimb.length > 0 && (
+          <Section title="For reimbursement claims">
+            {reimb.map((d, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "5px 0", borderBottom: i < reimb.length - 1 ? `1px solid ${T.bdr2}` : "none" }}>
+                <span style={{ color: T.teal, fontWeight: 700, fontSize: 12, flexShrink: 0 }}>✓</span>
+                <span style={{ fontSize: 12, color: T.text, lineHeight: 1.45 }}>{d}</span>
+              </div>
+            ))}
+          </Section>
+        )}
+        <ChipStrip chips={chips} onSug={onSug} />
+      </div>
+    );
+  }
+
+  // FORMAT D: NOT COVERED
+  if (intent === "NOT_COVERED") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start", maxWidth: "95%" }}>
+        <div style={{ background: T.amberLt, border: `1px solid ${T.amberBdr}`, borderRadius: 12, padding: "13px 15px", maxWidth: "95%" }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#78350F", marginBottom: 6 }}>Not covered under your policy</div>
+          <div style={{ fontSize: 13, color: "#92400E", lineHeight: 1.6 }}>{p["REASON"]}</div>
+          {p["EXCEPTION"] && p["EXCEPTION"].trim() && (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.amberBdr}`, fontSize: 12, color: "#78350F", lineHeight: 1.55 }}>
+              <span style={{ fontWeight: 600 }}>Exception: </span>{p["EXCEPTION"]}
+            </div>
+          )}
+        </div>
+        <ChipStrip chips={chips} onSug={onSug} />
+      </div>
+    );
+  }
+
+  // Fallback: plain text
+  return (
+    <div style={{ maxWidth: "82%", padding: "10px 13px", borderRadius: "15px 15px 15px 4px", fontSize: 13, lineHeight: 1.6, background: T.white, color: T.text, border: `1px solid ${T.bdr}` }}>
+      {text}
+    </div>
+  );
+}
+
+// ── BUBBLE ──
+function Bubble({ role, text, onSug }) {
+  if (role === "user") return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3 }}>
+      <div style={{ maxWidth: "80%", padding: "10px 14px", borderRadius: "16px 16px 4px 16px", fontSize: 14, lineHeight: 1.5, background: T.teal, color: "white" }}>{text}</div>
+      <span style={{ fontSize: 10, color: T.muted, paddingRight: 3 }}>Now</span>
+    </div>
+  );
+  if (role === "error") return (
+    <div style={{ background: T.amberLt, border: `1px solid ${T.amberBdr}`, borderRadius: 10, padding: "10px 13px", maxWidth: "88%", fontSize: 12, color: "#78350F" }}>
+      {text}
+    </div>
+  );
+  const isStructured = ["INTENT: COVERAGE","INTENT: PROCESS","INTENT: DOCUMENTS","INTENT: NOT_COVERED"].some(k => text.includes(k));
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 3 }}>
+      {isStructured
+        ? <StructuredResp text={text} onSug={onSug} />
+        : <div style={{ maxWidth: "82%", padding: "10px 13px", borderRadius: "15px 15px 15px 4px", fontSize: 13, lineHeight: 1.6, background: T.white, color: T.text, border: `1px solid ${T.bdr}` }}>{text}</div>
+      }
+      <span style={{ fontSize: 10, color: T.muted, paddingLeft: 3 }}>Now</span>
+    </div>
+  );
+}
+
+// ── NAV BAR ──
+function NavBar({ active, onNav, showNew }) {
+  const tabs = [
+    { id: "home", label: "Home", icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
+    { id: "inbox", label: "Inbox", icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> },
+    { id: "visits", label: "Visits", icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> },
+    { id: "navigator", label: "My Cover", icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> },
+    { id: "account", label: "Account", icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
+  ];
+  return (
+    <div style={{ height: 70, background: T.white, borderTop: `1px solid ${T.bdr}`, display: "flex", alignItems: "flex-start", justifyContent: "space-around", padding: "8px 0 0", flexShrink: 0 }}>
+      {tabs.map(t => {
+        const on = active === t.id;
+        return (
+          <div key={t.id} onClick={() => onNav(t.id)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, cursor: "pointer", padding: "4px 8px", minWidth: 56, position: "relative" }}>
+            <div style={{ color: on ? T.teal : T.text, opacity: on ? 1 : 0.28 }}>{t.icon}</div>
+            <span style={{ fontSize: 10, fontWeight: on ? 600 : 500, color: on ? T.teal : T.muted }}>{t.label}</span>
+            {t.id === "navigator" && showNew && (
+              <>
+                <span style={{ position: "absolute", top: 0, right: 2, background: T.coral, color: "white", fontSize: 8, fontWeight: 700, padding: "1px 4px", borderRadius: 5, animation: "pulseBadge 2s ease infinite" }}>NEW</span>
+                <div id="navTooltip" style={{ position: "absolute", bottom: 78, right: -8, background: T.text, color: "white", fontSize: 11, fontWeight: 500, padding: "8px 12px", borderRadius: 8, whiteSpace: "nowrap", zIndex: 300, boxShadow: "0 4px 16px rgba(0,0,0,0.2)", animation: "tooltipSlide 0.3s ease", cursor: "pointer" }} onClick={() => onNav("navigator")}>
+                  ✦ New: Check what your policy covers
+                  <div style={{ position: "absolute", top: "100%", right: 20, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: `5px solid ${T.text}` }} />
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── HOME SCREEN ──
+function HomeScreen({ onNav }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+      <div style={{ background: T.teal, padding: "14px 20px 0", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
+          <span style={{ fontSize: 26, fontWeight: 700, color: "white", letterSpacing: -1 }}>loop<span style={{ opacity: 0.5 }}>.</span></span>
+          <div style={{ width: 34, height: 34, background: "rgba(255,255,255,0.15)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+          </div>
+        </div>
+        <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 13, marginBottom: 14 }}>Good morning, Shantanu 👋</div>
+        <div style={{ background: T.tealDk, borderRadius: 16, padding: "13px 14px", display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
+          <div style={{ width: 38, height: 38, background: "rgba(255,255,255,0.15)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>👩‍⚕️</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: "white", fontSize: 13, fontWeight: 600 }}>Dr. Priya Menon</div>
+            <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 11, marginTop: 1 }}>MBBS, 10+ years · My Advisor</div>
+          </div>
+          <div style={{ width: 30, height: 30, background: "rgba(255,255,255,0.15)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          </div>
+        </div>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", background: T.bg, padding: "14px 14px 16px" }}>
+        <div onClick={() => onNav("navigator")} style={{ background: `linear-gradient(135deg, ${T.teal}, ${T.tealDk})`, borderRadius: 16, padding: "14px 16px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 14 }}>
+          <span style={{ background: T.coral, color: "white", fontSize: 9, fontWeight: 700, padding: "3px 7px", borderRadius: 8, flexShrink: 0 }}>NEW</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: "white", fontSize: 13, fontWeight: 600, marginBottom: 1 }}>Know your coverage instantly</div>
+            <div style={{ color: "rgba(255,255,255,0.65)", fontSize: 11 }}>Ask anything about your policy</div>
+          </div>
+          <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 16 }}>→</span>
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: T.text2, marginBottom: 8 }}>Our Offerings</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9, marginBottom: 14 }}>
+          {[
+            { i: "🩺", t: "Online consultation", s: "Book with a doctor" },
+            { i: "💬", t: "Chat with advisor", s: "Quick health answers" },
+            { i: "🧪", t: "Book lab tests", s: "At-home collection", b: "20% Off" },
+            { i: "🛡️", t: "My Cover", s: "Insurance clarity, instantly", hl: true },
+          ].map((c, idx) => (
+            <div key={idx} onClick={c.hl ? () => onNav("navigator") : undefined} style={{ background: c.hl ? T.tealPale : T.white, borderRadius: 12, padding: "13px 13px 14px", border: `1px solid ${c.hl ? T.teal : T.bdr}`, cursor: c.hl ? "pointer" : "default", position: "relative" }}>
+              {c.b && <span style={{ position: "absolute", top: 9, right: 9, background: T.coralLt, color: T.coral, fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 6 }}>{c.b}</span>}
+              <div style={{ fontSize: 20, marginBottom: 8 }}>{c.i}</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: T.text, marginBottom: 2 }}>{c.t}</div>
+              <div style={{ fontSize: 11, color: T.muted, lineHeight: 1.35 }}>{c.s}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: T.text2, marginBottom: 8 }}>My Insurance</div>
+        <div style={{ background: T.white, borderRadius: 12, border: `1px solid ${T.bdr}`, overflow: "hidden" }}>
+          <div style={{ background: T.tealLt, padding: "9px 13px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: T.tealDk }}>Meesho Technologies — Group Health</span>
+            <span style={{ fontSize: 11, color: T.teal, display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ width: 5, height: 5, background: T.teal, borderRadius: "50%", display: "inline-block" }} />Active
+            </span>
+          </div>
+          <div style={{ padding: "11px 13px", display: "flex", gap: 20 }}>
+            {[["Sum Insured", "₹5,00,000", false], ["Used", "₹12,400", true], ["Renews", "Mar 2027", false]].map(([l, v, r]) => (
+              <div key={l}>
+                <div style={{ fontSize: 10, color: T.muted, marginBottom: 3 }}>{l}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: r ? T.coral : T.text }}>{v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MY COVER SCREEN ──
+function NavScreen({ onNav }) {
+  const [msgs, setMsgs] = useState([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const chatRef = useRef(null);
+
+  useEffect(() => {
+    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+  }, [msgs, loading]);
+
+  const SUGS = [
+    "Is knee surgery covered?",
+    "How does reimbursement work for fractures?",
+    "My father was hospitalised — what do I do?",
+    "Is dengue fever covered?",
+    "What documents do I need for a claim?",
+    "Is root canal covered?",
+    "Normal delivery maternity claim",
+  ];
+
+  async function send(txt) {
+    const t = (txt || input).trim();
+    if (!t || loading) return;
+    setInput("");
+    setMsgs(prev => [...prev, { role: "user", text: t }]);
+    setLoading(true);
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: "user", content: t }]
+        })
+      });
+      const data = await res.json();
+      const reply = data.content[0].text;
+      setMsgs(prev => [...prev, { role: "assistant", text: reply }]);
+    } catch (e) {
+      setMsgs(prev => [...prev, { role: "error", text: "Could not reach the server. Please try again." }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+      <div style={{ background: T.teal, padding: "14px 20px 16px", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <div onClick={() => onNav("home")} style={{ width: 30, height: 30, background: "rgba(255,255,255,0.15)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </div>
+          <div>
+            <div style={{ color: "white", fontSize: 17, fontWeight: 700 }}>My Cover</div>
+            <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 11 }}>AI-powered policy clarity</div>
+          </div>
+        </div>
+        <div style={{ background: "rgba(255,255,255,0.11)", border: "1px solid rgba(255,255,255,0.18)", borderRadius: 12, padding: "10px 13px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 30, height: 30, background: "rgba(255,255,255,0.15)", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>🏢</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: "white", fontSize: 12, fontWeight: 600 }}>Meesho Technologies — Group Health</div>
+              <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, marginTop: 1 }}>₹5,00,000 · Self + Spouse + 2 Dependents · Loop corporate policy</div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.12)", borderRadius: 20, padding: "3px 8px", fontSize: 10, fontWeight: 600, color: "#7CDFCF", flexShrink: 0 }}>
+              <span style={{ width: 5, height: 5, background: "#7CDFCF", borderRadius: "50%", display: "inline-block" }} />Active
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div ref={chatRef} style={{ flex: 1, overflowY: "auto", background: T.bg, padding: "14px 13px 12px", display: "flex", flexDirection: "column", gap: 12 }}>
+        {msgs.length === 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 3 }}>
+              <div style={{ maxWidth: "84%", padding: "10px 13px", borderRadius: "15px 15px 15px 4px", fontSize: 13, lineHeight: 1.6, background: T.white, color: T.text, border: `1px solid ${T.bdr}` }}>
+                Hi! Ask me anything about your policy — what's covered, how to claim, what documents you need, or what to do in any health situation.
+                <div style={{ marginTop: 8, fontSize: 11, color: T.muted, fontStyle: "italic" }}>Policy guidance only, not medical advice.</div>
+              </div>
+              <span style={{ fontSize: 10, color: T.muted, paddingLeft: 3 }}>Now</span>
+            </div>
+            <div style={{ fontSize: 11, color: T.muted }}>Try asking:</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+              {SUGS.map(s => (
+                <div key={s} onClick={() => send(s)} style={{ background: T.white, border: `1.5px solid ${T.bdr}`, borderRadius: 20, padding: "5px 12px", fontSize: 12, fontWeight: 500, color: T.text, cursor: "pointer", whiteSpace: "nowrap" }}>{s}</div>
+              ))}
+            </div>
+          </div>
+        )}
+        {msgs.map((m, i) => <Bubble key={i} role={m.role} text={m.text} onSug={send} />)}
+        {loading && (
+          <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "11px 13px", background: T.white, border: `1px solid ${T.bdr}`, borderRadius: "15px 15px 15px 4px", width: "fit-content" }}>
+            {[0, 1, 2].map(i => <div key={i} style={{ width: 6, height: 6, background: T.muted, borderRadius: "50%", animation: `bounce 1.2s ${i * 0.2}s infinite` }} />)}
+          </div>
+        )}
+      </div>
+
+      <div style={{ background: T.white, borderTop: `1px solid ${T.bdr}`, padding: "10px 12px 14px", display: "flex", gap: 8, alignItems: "flex-end", flexShrink: 0 }}>
+        <textarea
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+          placeholder="Ask about your policy…"
+          rows={1}
+          style={{ flex: 1, background: T.bg, border: `1.5px solid ${T.bdr}`, borderRadius: 22, padding: "10px 16px", fontSize: 14, fontFamily: "inherit", color: T.text, outline: "none", resize: "none", maxHeight: 80, lineHeight: 1.4 }}
+        />
+        <div onClick={() => !loading && send()} style={{ width: 40, height: 40, background: loading ? T.bdr : T.teal, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: loading ? "default" : "pointer", flexShrink: 0 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── PRODUCT THINKING SCREEN ──
+function ThinkingScreen({ onNav }) {
+  const secs = [
+    { label: "Part 1 — The Gap", cards: [
+      { t: "Supply solved. Demand activation — not yet", badge: "Core insight", b: "Loop has built the healthcare infrastructure. What it hasn't built is the layer that helps employees understand and activate what they have. A benefit that isn't understood isn't a benefit." },
+      { t: "What this is not solving", b: "More doctors, 24/7 support, faster claims — operational fixes Loop is already making. They can be solved with headcount. This addresses structural product gaps headcount cannot fix." },
+      { t: "The 8 anxiety touchpoints", list: ["Is this covered? — user Googles or guesses", "How much? — PDF nobody reads", "Which hospital? — picks nearest, often wrong network", "Pre-auth needed? — finds out at counter, too late", "What documents? — generic 15-item list", "What do I pay upfront? — no visibility", "Claim status? — black hole", "Not covered — now what? — dead end"] },
+    ]},
+    { label: "Part 2 — The Buyer (HR / CFO)", cards: [
+      { t: "HR's hidden fear", badge: "Buyer insight", b: "The buyer's real job-to-be-done: don't become the villain in someone's worst moment. When a claim fails, HR gets the Slack message. This product deflects that entirely." },
+      { t: "Renewal is a rearview mirror problem", b: "HR renews annually on claims data — what went wrong, not what's coming. This product improves claim quality which directly strengthens Loop's renewal story." },
+      { t: "Loop's commercial upside", b: "Loop's unit economics benefit from higher utilisation. This product steers employees to in-network, cashless facilities. More correct utilisation is good for Loop's margins." },
+    ]},
+    { label: "Part 3 — The User", cards: [
+      { t: "The midnight hospitalisation problem", badge: "User insight", b: "The app gets opened for the first time under panic. This navigator is built specifically for high-stress, first-time use moments." },
+      { t: "The proxy-user problem", b: "Large share of real usage: employee navigating on behalf of an ageing parent, hospitalised spouse, newborn. This handles dependent-specific coverage correctly." },
+      { t: "Insurance language is a UX problem", b: "Loop speaks in the insurer's language. This product uses plain language throughout, replacing every insurance term with its human equivalent." },
+    ]},
+    { label: "Prototype Note", cards: [
+      { t: "What is mocked", warn: true, b: "Hospital network data and real-time cashless eligibility are mocked. Production requires live TPA/insurer API integration. Policy coverage logic, intent detection, and structured guidance are fully functional." },
+    ]},
+  ];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+      <div style={{ background: T.teal, padding: "14px 20px 18px", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div onClick={() => onNav("home")} style={{ width: 30, height: 30, background: "rgba(255,255,255,0.15)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </div>
+          <div>
+            <div style={{ color: "white", fontSize: 17, fontWeight: 700 }}>Product Thinking</div>
+            <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 11 }}>Why this was built</div>
+          </div>
+        </div>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", background: T.bg, padding: "14px 13px 16px" }}>
+        {secs.map((sec, si) => (
+          <div key={si}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: T.teal, textTransform: "uppercase", letterSpacing: 1, margin: si === 0 ? "0 0 10px" : "16px 0 10px" }}>{sec.label}</div>
+            {sec.cards.map((c, ci) => (
+              <div key={ci} style={{ background: c.warn ? T.amberLt : T.white, border: `1px solid ${c.warn ? T.amberBdr : T.bdr}`, borderRadius: 12, padding: 13, marginBottom: 9 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: c.warn ? "#92400E" : T.text, marginBottom: 7, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  {c.t}
+                  {c.badge && <span style={{ background: T.tealLt, color: T.tealDk, fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 6 }}>{c.badge}</span>}
+                </div>
+                {c.b && <div style={{ fontSize: 12, color: c.warn ? "#78350F" : T.text2, lineHeight: 1.65 }}>{c.b}</div>}
+                {c.list && <ul style={{ paddingLeft: 15, marginTop: 5 }}>{c.list.map((it, li) => <li key={li} style={{ fontSize: 12, color: T.text2, lineHeight: 1.65, marginBottom: 4 }}>{it}</li>)}</ul>}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Placeholder({ icon, title, sub }) {
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: T.bg, textAlign: "center", padding: 40 }}>
+      <div style={{ fontSize: 38, marginBottom: 13 }}>{icon}</div>
+      <div style={{ fontSize: 17, fontWeight: 700, color: T.text, marginBottom: 5 }}>{title}</div>
+      <div style={{ fontSize: 13, color: T.muted }}>{sub}</div>
+    </div>
+  );
+}
+
+function App() {
+  const [screen, setScreen] = useState("home");
+  const [showNew, setShowNew] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowNew(false), 5000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  function nav(s) { setScreen(s); if (s === "navigator") setShowNew(false); }
+
+  const screens = {
+    home: <HomeScreen onNav={nav} />,
+    navigator: <NavScreen onNav={nav} />,
+    thinking: <ThinkingScreen onNav={nav} />,
+    inbox: <Placeholder icon="📬" title="Inbox" sub="Messages from your medical advisor" />,
+    visits: <Placeholder icon="🩺" title="Visits" sub="Your consultations and appointments" />,
+    account: <Placeholder icon="👤" title="Account" sub="Profile and settings" />,
+  };
+
+  return (
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, sans-serif; }
+        body { background: #DDE3EA; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+        @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-5px)} }
+        @keyframes pulseBadge { 0%,100%{opacity:1} 50%{opacity:0.65} }
+        @keyframes tooltipSlide { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:translateY(0)} }
+        textarea { font-family: 'Inter', -apple-system, sans-serif; }
+        textarea:focus { border-color: #2BB5A0 !important; outline: none; }
+        ::-webkit-scrollbar { width: 2px; }
+        ::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
+      `}</style>
+      <div style={{ width: 390, height: 844, background: T.white, borderRadius: 50, boxShadow: "0 40px 100px rgba(0,0,0,0.25), 0 0 0 10px #111, 0 0 0 12px #2a2a2a", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div style={{ height: 44, background: T.teal, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", flexShrink: 0 }}>
+          <span style={{ color: "white", fontSize: 15, fontWeight: 600 }}>9:41</span>
+          <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+            <svg width="16" height="11" viewBox="0 0 16 11" fill="white"><rect x="0" y="4" width="2.5" height="7" rx="0.8"/><rect x="4" y="2.5" width="2.5" height="8.5" rx="0.8"/><rect x="8" y="0.5" width="2.5" height="10.5" rx="0.8"/></svg>
+            <svg width="24" height="11" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="white" strokeOpacity="0.4"/><rect x="2" y="2" width="15" height="8" rx="2" fill="white"/></svg>
+          </div>
+        </div>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          {screens[screen] || screens.home}
+        </div>
+        <NavBar active={screen} onNav={nav} showNew={showNew} />
+      </div>
+    </>
+  );
+}
+
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>

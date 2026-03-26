@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>My Cover — Loop Health</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --teal: #2BB5A0;
+    --teal-dk: #1E9B88;
+    --teal-lt: #E6F7F5;
+    --teal-pale: #F2FAFA;
+    --coral: #F07060;
+    --amber: #F59E0B;
+    --amber-lt: #FFFBEB;
+    --amber-bdr: #FDE68A;
+    --dark: #1A1A2E;
+    --dark-2: #2D2D45;
+    --white: #FFFFFF;
+    --bg: #F5F7F9;
+    --text: #1A1A2E;
+    --text-2: #4A5568;
+    --muted: #9AA5B4;
+    --border: #E2E8F0;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--white);
+    color: var(--text);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* ── SECTION BASE ── */
+  section {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 80px 0;
+  }
+
+  .container {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 48px;
+    width: 100%;
+  }
+
+  /* ── SECTION LABEL ── */
+  .section-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+  .section-label-bar {
+    width: 3px;
+    height: 18px;
+    background: var(--teal);
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .section-label-text {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--teal);
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+  }
+
+  /* ── REVEAL ANIMATION ── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.65s ease, transform 0.65s ease;
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .reveal-delay-1 { transition-delay: 0.1s; }
+  .reveal-delay-2 { transition-delay: 0.2s; }
+  .reveal-delay-3 { transition-delay: 0.3s; }
+  .reveal-delay-4 { transition-delay: 0.4s; }
+
+  /* ════════════════════════════
+     SECTION 1 — HOOK
+  ════════════════════════════ */
+  #hook {
+    background: var(--teal);
+    min-height: 100vh;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  #hook::before {
+    content: '';
+    position: absolute;
+    top: -120px; right: -120px;
+    width: 400px; height: 400px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 50%;
+  }
+  #hook::after {
+    content: '';
+    position: absolute;
+    bottom: -80px; left: -60px;
+    width: 280px; height: 280px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 50%;
+  }
+  .hook-eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+  .hook-line-1 {
+    font-size: 42px;
+    font-weight: 700;
+    color: white;
+    line-height: 1.2;
+    margin-bottom: 12px;
+    letter-spacing: -0.5px;
+  }
+  .hook-line-2 {
+    font-size: 42px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.5);
+    line-height: 1.2;
+    letter-spacing: -0.5px;
+    margin-bottom: 48px;
+  }
+  .hook-sub {
+    font-size: 16px;
+    color: rgba(255,255,255,0.6);
+    max-width: 480px;
+    margin: 0 auto 48px;
+    line-height: 1.7;
+    font-weight: 400;
+  }
+  .scroll-cue {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .scroll-cue-line {
+    width: 1px;
+    height: 40px;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.4), transparent);
+    animation: scrollPulse 2s ease infinite;
+  }
+  @keyframes scrollPulse {
+    0%, 100% { opacity: 0.4; transform: scaleY(1); }
+    50% { opacity: 0.8; transform: scaleY(1.1); }
+  }
+  .scroll-cue-text {
+    font-size: 10px;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  /* ════════════════════════════
+     SECTION 2 — GAP
+  ════════════════════════════ */
+  #gap { background: var(--white); }
+
+  .gap-headline {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.4;
+    margin-bottom: 20px;
+    max-width: 640px;
+    letter-spacing: -0.3px;
+  }
+  .gap-body {
+    font-size: 16px;
+    color: var(--text-2);
+    line-height: 1.8;
+    max-width: 620px;
+    margin-bottom: 16px;
+  }
+  .gap-body em {
+    font-style: normal;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .gap-two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 36px;
+  }
+  .gap-card {
+    border-radius: 12px;
+    padding: 20px 22px;
+  }
+  .gap-card-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 8px;
+  }
+  .gap-card-text {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+  .gap-card.built {
+    background: var(--teal-pale);
+    border-left: 3px solid var(--teal);
+  }
+  .gap-card.built .gap-card-label { color: var(--teal); }
+  .gap-card.built .gap-card-text { color: var(--text); }
+  .gap-card.missing {
+    background: var(--amber-lt);
+    border-left: 3px solid var(--amber);
+  }
+  .gap-card.missing .gap-card-label { color: #92400E; }
+  .gap-card.missing .gap-card-text { color: #78350F; }
+
+  /* ════════════════════════════
+     SECTION 3 — FRAMEWORK
+  ════════════════════════════ */
+  #framework { background: var(--bg); }
+
+  .framework-headline {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 8px;
+    letter-spacing: -0.3px;
+  }
+  .framework-sub {
+    font-size: 15px;
+    color: var(--muted);
+    margin-bottom: 40px;
+  }
+  .framework-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+  .framework-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px 22px;
+    position: relative;
+    overflow: hidden;
+  }
+  .framework-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--teal);
+  }
+  .framework-card-part {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--teal);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 12px;
+    margin-top: 8px;
+  }
+  .framework-card-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  .framework-card-body {
+    font-size: 12px;
+    color: var(--text-2);
+    line-height: 1.65;
+  }
+  .framework-card-insight {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.55;
+    font-style: italic;
+  }
+
+  /* ════════════════════════════
+     SECTION 4 — PRIORITISATION
+  ════════════════════════════ */
+  #prioritisation { background: var(--white); }
+
+  .pri-headline {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 8px;
+    letter-spacing: -0.3px;
+  }
+  .pri-sub {
+    font-size: 15px;
+    color: var(--muted);
+    margin-bottom: 28px;
+    max-width: 560px;
+    line-height: 1.6;
+  }
+  .pri-legend {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+  .pri-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 20px;
+    padding: 5px 13px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .pri-pill-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .pri-pill.p0 { background: #E6F7F5; color: #065F46; }
+  .pri-pill.p0 .pri-pill-dot { background: var(--teal); }
+  .pri-pill.p1 { background: var(--amber-lt); color: #92400E; }
+  .pri-pill.p1 .pri-pill-dot { background: var(--amber); }
+  .pri-pill.p2 { background: #F3F4F6; color: #6B7280; }
+  .pri-pill.p2 .pri-pill-dot { background: #D1D5DB; }
+
+  .pri-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .pri-table th {
+    text-align: left;
+    padding: 8px 12px;
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    border-bottom: 2px solid var(--border);
+  }
+  .pri-table td {
+    padding: 11px 12px;
+    vertical-align: top;
+    border-bottom: 1px solid #F0F4F0;
+    line-height: 1.45;
+  }
+  .pri-table tr.p0-row { background: #FAFFFE; }
+  .pri-table tr.p0-row td:first-child { font-weight: 600; color: var(--text); }
+  .pri-table tr.p1-row td:first-child { font-weight: 600; color: var(--text); }
+  .pri-table tr.p2-row { opacity: 0.45; }
+  .pri-table tr.p2-row td:first-child { color: #6B7280; }
+
+  .severity-high { color: #065F46; font-weight: 600; }
+  .severity-medium { color: #92400E; font-weight: 600; }
+  .severity-low { color: #6B7280; font-weight: 500; }
+
+  .pri-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .pri-badge.p0 { background: #D1FAE5; color: #065F46; }
+  .pri-badge.p1 { background: #FEF3C7; color: #92400E; }
+  .pri-badge.p2 { background: #F3F4F6; color: #6B7280; }
+
+  /* ════════════════════════════
+     SECTION 5 — CTA
+  ════════════════════════════ */
+  #cta {
+    background: var(--dark);
+    min-height: 60vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  #cta::before {
+    content: '';
+    position: absolute;
+    top: -80px; right: -80px;
+    width: 320px; height: 320px;
+    background: rgba(43,181,160,0.07);
+    border-radius: 50%;
+  }
+  #cta::after {
+    content: '';
+    position: absolute;
+    bottom: -60px; left: -40px;
+    width: 240px; height: 240px;
+    background: rgba(43,181,160,0.05);
+    border-radius: 50%;
+  }
+  .cta-eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .cta-headline {
+    font-size: 32px;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 10px;
+    letter-spacing: -0.5px;
+  }
+  .cta-sub {
+    font-size: 15px;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 36px;
+    max-width: 420px;
+    line-height: 1.6;
+  }
+  .cta-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--teal);
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 15px 34px;
+    border-radius: 32px;
+    text-decoration: none;
+    transition: background 0.2s, transform 0.15s;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    border: none;
+  }
+  .cta-btn:hover { background: var(--teal-dk); transform: translateY(-1px); }
+  .cta-note {
+    margin-top: 20px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.25);
+  }
+
+  /* ── NAV DOT ── */
+  .nav-dots {
+    position: fixed;
+    right: 28px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 100;
+  }
+  .nav-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.15);
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  .nav-dot.active { background: var(--teal); transform: scale(1.4); }
+  #hook ~ * .nav-dot { background: rgba(255,255,255,0.3); }
+
+  /* on hook section, dots are white */
+  body.on-hook .nav-dot { background: rgba(255,255,255,0.3); }
+  body.on-hook .nav-dot.active { background: white; }
+
+  @media (max-width: 700px) {
+    .hook-line-1, .hook-line-2 { font-size: 28px; }
+    .gap-two-col, .framework-cards { grid-template-columns: 1fr; }
+    .container { padding: 0 24px; }
+    .nav-dots { display: none; }
+    .pri-table th:nth-child(3),
+    .pri-table th:nth-child(4),
+    .pri-table th:nth-child(5),
+    .pri-table td:nth-child(3),
+    .pri-table td:nth-child(4),
+    .pri-table td:nth-child(5) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV DOTS -->
+<nav class="nav-dots" id="navDots">
+  <div class="nav-dot active" onclick="scrollToSection(0)" title="Hook"></div>
+  <div class="nav-dot" onclick="scrollToSection(1)" title="Gap"></div>
+  <div class="nav-dot" onclick="scrollToSection(2)" title="Framework"></div>
+  <div class="nav-dot" onclick="scrollToSection(3)" title="Prioritisation"></div>
+  <div class="nav-dot" onclick="scrollToSection(4)" title="Prototype"></div>
+</nav>
+
+<!-- ════ SECTION 1: HOOK ════ -->
+<section id="hook">
+  <div class="container" style="text-align:center; position:relative; z-index:1;">
+    <div class="hook-eyebrow reveal">My Cover · Loop Health</div>
+    <div class="hook-line-1 reveal reveal-delay-1">Loop has built the infrastructure.</div>
+    <div class="hook-line-2 reveal reveal-delay-2">My Cover is the layer that makes it usable.</div>
+    <div class="hook-sub reveal reveal-delay-3">A policy navigator built inside the Loop app — so employees can understand, navigate, and use their insurance before they need it most.</div>
+    <div class="scroll-cue reveal reveal-delay-4">
+      <div class="scroll-cue-line"></div>
+      <div class="scroll-cue-text">Scroll</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ SECTION 2: GAP ════ -->
+<section id="gap">
+  <div class="container">
+    <div class="section-label reveal">
+      <div class="section-label-bar"></div>
+      <div class="section-label-text">Gap</div>
+    </div>
+    <div class="gap-headline reveal reveal-delay-1">Group health insurance is sold to companies, but used by employees.</div>
+    <div class="gap-body reveal reveal-delay-2">The buyer — HR — understands the policy. The employee encounters it for the first time at the worst possible moment: mid-crisis, mid-stress, with no clear path forward.</div>
+    <div class="gap-body reveal reveal-delay-2">Understanding a policy requires effort the product <em>rarely makes easy</em>. Employees figure it out when they have to — reaching out to HR insurance PoCs, Googling symptoms alongside coverage questions, or simply making the wrong call and paying for it later.</div>
+    <div class="gap-body reveal reveal-delay-3">A self-serve policy intelligence layer changes this for all three parties. <em>Employees</em> get confidence and clarity. <em>HR</em> gets out of the accidental support role they never signed up for. <em>Loop</em> gets better in-network utilisation, cleaner claims, and a stronger renewal story.</div>
+    <div class="gap-two-col reveal reveal-delay-3">
+      <div class="gap-card built">
+        <div class="gap-card-label">What Loop has built</div>
+        <div class="gap-card-text">Doctors, insurance, labs, wellness — the full healthcare infrastructure</div>
+      </div>
+      <div class="gap-card missing">
+        <div class="gap-card-label">What's missing</div>
+        <div class="gap-card-text">The layer that helps employees understand and activate what they already have</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ SECTION 3: FRAMEWORK ════ -->
+<section id="framework">
+  <div class="container">
+    <div class="section-label reveal">
+      <div class="section-label-bar"></div>
+      <div class="section-label-text">Framework</div>
+    </div>
+    <div class="framework-headline reveal reveal-delay-1">Three lenses. One product.</div>
+    <div class="framework-sub reveal reveal-delay-1">My Cover was built by examining the problem from three distinct angles — the structural gap, the buyer's reality, and the user's moment.</div>
+    <div class="framework-cards">
+      <div class="framework-card reveal reveal-delay-1">
+        <div class="framework-card-part">Part 1</div>
+        <div class="framework-card-title">Gap</div>
+        <div class="framework-card-body">Supply is built. Demand activation is missing. A benefit not understood is not a benefit — regardless of how good the underlying product is.</div>
+        <div class="framework-card-insight">Operational fixes — more doctors, faster claims — don't solve this. It requires a different product surface.</div>
+      </div>
+      <div class="framework-card reveal reveal-delay-2">
+        <div class="framework-card-part">Part 2</div>
+        <div class="framework-card-title">Buyer</div>
+        <div class="framework-card-body">HR's real job-to-be-done is not administering insurance. It's ensuring the benefit works without becoming the villain in someone's worst moment.</div>
+        <div class="framework-card-insight">Every failed claim generates an HR ticket. Every HR ticket is a renewal risk. My Cover deflects both.</div>
+      </div>
+      <div class="framework-card reveal reveal-delay-3">
+        <div class="framework-card-part">Part 3</div>
+        <div class="framework-card-title">User</div>
+        <div class="framework-card-body">The app is opened for the first time under panic. The product was designed for calm, planned interactions. There is a fundamental mismatch between design context and use context.</div>
+        <div class="framework-card-insight">This navigator is built specifically for high-stress, first-time use moments — not ideal conditions.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ SECTION 4: PRIORITISATION ════ -->
+<section id="prioritisation">
+  <div class="container">
+    <div class="section-label reveal">
+      <div class="section-label-bar"></div>
+      <div class="section-label-text">Prioritisation</div>
+    </div>
+    <div class="pri-headline reveal reveal-delay-1">7 anxiety touchpoints. Solved in order of impact.</div>
+    <div class="pri-sub reveal reveal-delay-1">P2 touchpoints are explicitly deprioritised — either the failure path is recoverable, or Loop already partially solves them through existing channels.</div>
+    <div class="pri-legend reveal reveal-delay-2">
+      <div class="pri-pill p0"><div class="pri-pill-dot"></div>P0 — Build now</div>
+      <div class="pri-pill p1"><div class="pri-pill-dot"></div>P1 — Next sprint</div>
+      <div class="pri-pill p2"><div class="pri-pill-dot"></div>P2 — Deprioritised</div>
+    </div>
+    <div class="reveal reveal-delay-2" style="overflow-x:auto;">
+      <table class="pri-table">
+        <thead>
+          <tr>
+            <th style="width:22%;">Touchpoint</th>
+            <th style="width:11%;">Severity</th>
+            <th style="width:22%;">Proxy</th>
+            <th style="width:17%;">User Journey</th>
+            <th style="width:18%;">Failure Path</th>
+            <th style="width:10%; text-align:center;">Priority</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="p0-row">
+            <td>Is this covered?</td>
+            <td><span class="severity-high">High</span></td>
+            <td style="color:#4A5568; font-size:11px;">HR or Google — slow, often wrong</td>
+            <td style="color:#4A5568; font-size:11px;">First moment of concern</td>
+            <td style="color:#4A5568; font-size:11px;">Wrong decision, cascades downstream</td>
+            <td style="text-align:center;"><span class="pri-badge p0">P0</span></td>
+          </tr>
+          <tr class="p0-row">
+            <td>How much am I insured for + what do I pay?</td>
+            <td><span class="severity-high">High</span></td>
+            <td style="color:#4A5568; font-size:11px;">Policy PDF + hospital estimate — unreadable, unreliable</td>
+            <td style="color:#4A5568; font-size:11px;">Before going to hospital</td>
+            <td style="color:#4A5568; font-size:11px;">Financial shock at discharge</td>
+            <td style="text-align:center;"><span class="pri-badge p0">P0</span></td>
+          </tr>
+          <tr class="p0-row">
+            <td>Which network hospital?</td>
+            <td><span class="severity-high">High</span></td>
+            <td style="color:#4A5568; font-size:11px;">Google Maps — ignores network entirely</td>
+            <td style="color:#4A5568; font-size:11px;">Deciding where to go</td>
+            <td style="color:#4A5568; font-size:11px;">Out-of-network visit, full claim rejection</td>
+            <td style="text-align:center;"><span class="pri-badge p0">P0</span></td>
+          </tr>
+          <tr class="p1-row">
+            <td>Do I need to inform Loop before admission?</td>
+            <td><span class="severity-high">High</span></td>
+            <td style="color:#4A5568; font-size:11px;">HR or hospital desk — found out too late</td>
+            <td style="color:#4A5568; font-size:11px;">At hospital admission</td>
+            <td style="color:#4A5568; font-size:11px;">Cashless denied, forced reimbursement</td>
+            <td style="text-align:center;"><span class="pri-badge p1">P1</span></td>
+          </tr>
+          <tr class="p1-row">
+            <td>Not covered — what now?</td>
+            <td><span class="severity-medium">Medium</span></td>
+            <td style="color:#4A5568; font-size:11px;">HR — accessible but leaves user stuck</td>
+            <td style="color:#4A5568; font-size:11px;">First moment of concern</td>
+            <td style="color:#4A5568; font-size:11px;">Pays out of pocket, no alternatives shown</td>
+            <td style="text-align:center;"><span class="pri-badge p1">P1</span></td>
+          </tr>
+          <tr class="p2-row">
+            <td>What documents do I need?</td>
+            <td><span class="severity-low">Low</span></td>
+            <td style="color:#9AA5B4; font-size:11px;">HR — accessible</td>
+            <td style="color:#9AA5B4; font-size:11px;">Post-discharge</td>
+            <td style="color:#9AA5B4; font-size:11px;">Claim delayed, not rejected</td>
+            <td style="text-align:center;"><span class="pri-badge p2">P2</span></td>
+          </tr>
+          <tr class="p2-row">
+            <td>Claim status</td>
+            <td><span class="severity-low">Medium</span></td>
+            <td style="color:#9AA5B4; font-size:11px;">Loop WhatsApp — already partially solved</td>
+            <td style="color:#9AA5B4; font-size:11px;">Post-discharge</td>
+            <td style="color:#9AA5B4; font-size:11px;">Stress, financially recoverable</td>
+            <td style="text-align:center;"><span class="pri-badge p2">P2</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ════ SECTION 5: CTA ════ -->
+<section id="cta">
+  <div class="container" style="position:relative; z-index:1;">
+    <div class="cta-eyebrow reveal">See it built</div>
+    <div class="cta-headline reveal reveal-delay-1">My Cover, inside the Loop app.</div>
+    <div class="cta-sub reveal reveal-delay-2">Interact with the prototype to see how each P0 touchpoint is resolved — for yourself, or for a family member on your policy.</div>
+    <div class="reveal reveal-delay-3">
+      <button class="cta-btn" onclick="window.open('about:blank','_blank')" id="protoBtn">
+        Open the prototype <span>→</span>
+      </button>
+    </div>
+    <div class="cta-note reveal reveal-delay-4">Built by Shantanu Rajhans · Senior PM candidate</div>
+  </div>
+</section>
+
+<script>
+  const sections = ['hook','gap','framework','prioritisation','cta'];
+  const dots = document.querySelectorAll('.nav-dot');
+
+  function scrollToSection(i) {
+    document.getElementById(sections[i]).scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // Active dot on scroll
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const i = sections.indexOf(entry.target.id);
+        dots.forEach((d, j) => d.classList.toggle('active', i === j));
+        // White dots on hook
+        if (entry.target.id === 'hook') {
+          document.body.classList.add('on-hook');
+        } else {
+          document.body.classList.remove('on-hook');
+        }
+      }
+    });
+  }, { threshold: 0.5 });
+
+  sections.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) observer.observe(el);
+  });
+
+  // Reveal on scroll
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.12 });
+
+  document.querySelectorAll('.reveal').forEach(el => {
+    revealObserver.observe(el);
+    // Immediately show hook section elements
+    if (el.closest('#hook')) el.classList.add('visible');
+  });
+</script>
+</body>
+</html>
